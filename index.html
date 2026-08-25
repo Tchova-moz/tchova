@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tchova V1.2 — GPS</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f5f6f8;color:#171717}
+.app{max-width:430px;min-height:100vh;margin:auto;background:#fff;padding:28px 22px;display:flex;flex-direction:column}
+.logo{font-size:40px;font-weight:800;letter-spacing:2px;margin-top:45px}.sub{color:#666;margin:8px 0 35px}
+.location,.card{padding:16px;background:#f0f2f4;border-radius:14px;margin-bottom:18px}
+button{width:100%;border:0;border-radius:14px;padding:16px;margin:7px 0;font-size:16px;font-weight:700}
+.primary{background:#111;color:#fff}.secondary{background:#e9ecef;color:#111}.hidden{display:none}
+input{width:100%;padding:15px;border:1px solid #ccc;border-radius:12px;margin:7px 0 12px;font-size:16px}
+.small{text-align:center;color:#777;font-size:13px;margin-top:18px}
+.link{background:none!important;color:#333!important}
+h1{margin-top:10px}.status{padding:12px;border-radius:12px;background:#fff;margin-top:10px;font-size:14px}
+.coords{font-family:monospace;font-size:13px;word-break:break-word}
+.mapbox{height:260px;border-radius:14px;overflow:hidden;background:#ddd;margin-top:12px}
+.mapbox iframe{width:100%;height:100%;border:0}
+</style>
+</head>
+<body>
+
+<div class="app" id="home">
+<div class="logo">TCHOVA</div>
+<div class="sub">O teu mototáxi, simples e rápido.</div>
+<div class="location">📍 <b>Vila da Macia</b></div>
+<button class="primary" onclick="profile('passenger')">👤 SOU PASSAGEIRO</button>
+<button class="secondary" onclick="profile('driver')">🏍️ SOU MOTOTAXISTA</button>
+<div class="small">Tchova V1.2 — GPS</div>
+</div>
+
+<div class="app hidden" id="auth">
+<h1 id="title">Entrar</h1><p id="roleText"></p>
+<div class="card">
+<input id="name" placeholder="Nome completo">
+<input id="phone" placeholder="Número de telefone" inputmode="tel">
+<input id="bike" placeholder="Identificação da motorizada" class="hidden">
+<input id="password" placeholder="Palavra-passe" type="password">
+<button class="primary" onclick="submitAuth()">CONTINUAR</button>
+<button class="link" onclick="toggleMode()">Ainda não tenho conta / Criar conta</button>
+<button class="secondary" onclick="show('home')">← Voltar</button>
+</div>
+</div>
+
+<div class="app hidden" id="dashboard">
+<h1 id="welcome">Bem-vindo</h1>
+<div class="card" id="dashText"></div>
+<div class="card">
+<b>📍 Localização</b>
+<div id="gpsStatus" class="status">A localização ainda não foi obtida.</div>
+<div id="coords" class="coords"></div>
+<button class="primary" onclick="getLocation()">📍 USAR A MINHA LOCALIZAÇÃO</button>
+<div id="map" class="mapbox hidden"></div>
+</div>
+<button class="secondary" onclick="show('home')">SAIR</button>
+</div>
+
+<script>
+let role='', signup=false;
+
+function show(id){
+  document.querySelectorAll('.app').forEach(x=>x.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function profile(r){role=r;signup=false;renderAuth();show('auth')}
+
+function toggleMode(){signup=!signup;renderAuth()}
+
+function renderAuth(){
+  document.getElementById('title').textContent=signup?'Criar conta':'Entrar';
+  document.getElementById('roleText').textContent=role==='driver'?'🏍️ Conta de mototaxista':'👤 Conta de passageiro';
+  document.getElementById('name').classList.toggle('hidden',!signup);
+  document.getElementById('bike').classList.toggle('hidden',!(signup&&role==='driver'));
+  document.querySelector('.link').textContent=signup?'Já tenho uma conta / Entrar':'Ainda não tenho conta / Criar conta';
+}
+
+function submitAuth(){
+  let phone=document.getElementById('phone').value.trim();
+  let pass=document.getElementById('password').value.trim();
+  if(!phone||!pass||(signup&&!document.getElementById('name').value.trim())){
+    alert('Preenche os campos necessários.'); return;
+  }
+  document.getElementById('welcome').textContent=signup?'Conta criada!':'Bem-vindo!';
+  document.getElementById('dashText').textContent=role==='driver'
+    ?'🏍️ Área do mototaxista — Vila da Macia.'
+    :'👤 Área do passageiro — Vila da Macia.';
+  document.getElementById('gpsStatus').textContent='A localização ainda não foi obtida.';
+  document.getElementById('coords').textContent='';
+  document.getElementById('map').classList.add('hidden');
+  show('dashboard');
+}
+
+function getLocation(){
+  const status=document.getElementById('gpsStatus');
+  const coords=document.getElementById('coords');
+  if(!navigator.geolocation){
+    status.textContent='❌ Este navegador não suporta GPS.';
+    return;
+  }
+  status.textContent='⏳ A pedir a tua localização...';
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const lat=pos.coords.latitude;
+      const lon=pos.coords.longitude;
+      status.textContent='✅ Localização encontrada.';
+      coords.textContent=`Latitude: ${lat.toFixed(6)} | Longitude: ${lon.toFixed(6)}`;
+
+      const delta=0.006;
+      const bbox=`${lon-delta},${lat-delta},${lon+delta},${lat+delta}`;
+      const iframe=document.getElementById('map');
+      iframe.innerHTML=`<iframe loading="lazy"
+        src="https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${lat},${lon}"
+        title="Mapa da localização atual"></iframe>`;
+      iframe.classList.remove('hidden');
+    },
+    err=>{
+      const messages={
+        1:'❌ Permissão de localização recusada. Ativa o GPS e permite a localização.',
+        2:'❌ Não foi possível determinar a localização.',
+        3:'❌ A localização demorou demasiado. Tenta novamente.'
+      };
+      status.textContent=messages[err.code]||'❌ Erro ao obter localização.';
+    },
+    {enableHighAccuracy:true,timeout:15000,maximumAge:10000}
+  );
+}
+
+renderAuth();
+</script>
+</body>
+</html>
