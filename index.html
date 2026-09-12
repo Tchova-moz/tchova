@@ -53,7 +53,24 @@ h1{margin-top:10px}.status{padding:12px;border-radius:12px;background:#fff;margi
 <div id="coords" class="coords"></div>
 <button class="primary" onclick="getLocation()">📍 USAR A MINHA LOCALIZAÇÃO</button>
 <div id="map" class="mapbox hidden"></div>
-</div>
+</div><div class="card">
+  <h3>🛵 Nova viagem</h3>
+
+  <input id="destination" placeholder="Para onde vais?">
+
+  <select id="payment">
+    <option value="">💳 Forma de pagamento</option>
+    <option value="cash">💵 Dinheiro</option>
+    <option value="digital">📱 Pagamento digital</option>
+  </select>
+
+  <button class="primary" onclick="requestTrip()">
+    🛵 SOLICITAR VIAGEM
+  </button>
+
+  <div id="tripStatus" class="status"></div>
+  <div id="fare" class="status"></div>
+  </div>
 <button class="secondary" onclick="show('home')">SAIR</button>
 </div>
 
@@ -127,7 +144,77 @@ function getLocation(){
     {enableHighAccuracy:true,timeout:15000,maximumAge:10000}
   );
 }
+async function requestTrip(){
+  const destination=document.getElementById('destination').value.trim();
+  const payment=document.getElementById('payment').value;
+  const tripStatus=document.getElementById('tripStatus');
+  const fare=document.getElementById('fare');
 
+  if(!destination){
+    tripStatus.textContent='❌ Indica o destino da viagem.';
+    return;
+  }
+
+  if(!payment){
+    tripStatus.textContent='❌ Escolhe a forma de pagamento.';
+    return;
+  }
+
+  tripStatus.textContent='🔎 A calcular a viagem...';
+  fare.textContent='';
+
+  if(!navigator.geolocation){
+    tripStatus.textContent='❌ O teu navegador não suporta localização.';
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const lat=pos.coords.latitude;
+    const lon=pos.coords.longitude;
+
+    try{
+      const url=`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(destination)}`;
+      const response=await fetch(url);
+      const data=await response.json();
+
+      if(!data.length){
+        tripStatus.textContent='❌ Não encontrei esse destino.';
+        return;
+      }
+
+      const destLat=parseFloat(data[0].lat);
+      const destLon=parseFloat(data[0].lon);
+
+      const R=6371;
+      const dLat=(destLat-lat)*Math.PI/180;
+      const dLon=(destLon-lon)*Math.PI/180;
+
+      const a=
+        Math.sin(dLat/2)**2+
+        Math.cos(lat*Math.PI/180)*
+        Math.cos(destLat*Math.PI/180)*
+        Math.sin(dLon/2)**2;
+
+      const distance=R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+
+      const base=50;
+      const porKm=25;
+      const estimatedFare=Math.max(base,Math.round(base+(distance*porKm)));
+
+      tripStatus.textContent=
+        '✅ Viagem preparada. Destino: '+data[0].display_name;
+
+      fare.textContent=
+        '📍 Distância aproximada: '+distance.toFixed(2)+' km | 💰 Tarifa estimada: '+estimatedFare+' MT';
+
+    }catch(error){
+      tripStatus.textContent='❌ Não foi possível calcular a viagem. Tenta novamente.';
+    }
+
+  },()=>{
+    tripStatus.textContent='❌ Precisamos da tua localização para calcular a viagem.';
+  });
+  }
 renderAuth();
 </script>
 </body>
