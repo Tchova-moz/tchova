@@ -206,7 +206,26 @@ async function requestTrip(){
 
       fare.textContent=
         '📍 Distância aproximada: '+distance.toFixed(2)+' km | 💰 Tarifa estimada: '+estimatedFare+' MT';
+const tripRequest={
+  id:'TCH-'+Date.now(),
+  destination:destination,
+  destinationName:data[0].display_name,
+  payment:payment,
+  pickupLat:lat,
+  pickupLon:lon,
+  distanceKm:Number(distance.toFixed(2)),
+  estimatedFare:estimatedFare,
+  status:'A procurar mototaxista...',
+  createdAt:new Date().toISOString()
+};
 
+localStorage.setItem('tchovaTripRequest',JSON.stringify(tripRequest));
+
+tripStatus.textContent=
+'🟡 Pedido enviado! A procurar mototaxista...';
+
+fare.textContent=
+'📍 '+distance.toFixed(2)+' km | 💰 '+estimatedFare+' MT';
     }catch(error){
       tripStatus.textContent='❌ Não foi possível calcular a viagem. Tenta novamente.';
     }
