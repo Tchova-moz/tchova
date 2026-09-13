@@ -111,14 +111,26 @@ function carregarPedido(){
 
   const pedido = JSON.parse(pedidoGuardado);
 
-  if(pedido.status !== "A procurar mototaxista..."){
+  
+if(pedido.status === "Mototaxista encontrado"){
 
-    pedidoDiv.innerHTML =
-      '<div class="vazio">Nenhum pedido novo disponível.</div>';
+  pedidoDiv.innerHTML = `
+    <div class="status">
+      🟢 <b>Viagem aceite!</b><br><br>
+      O mototaxista aceitou o pedido do passageiro.
+    </div>
+  `;
 
-    return;
-  }
+  return;
+}
 
+if(pedido.status !== "A procurar mototaxista..."){
+
+  pedidoDiv.innerHTML =
+    '<div class="vazio">Nenhum pedido novo disponível.</div>';
+
+  return;
+}
   pedidoDiv.innerHTML = `
     <div class="info">
       📍 <b>Destino:</b> ${pedido.destinationName}<br>
