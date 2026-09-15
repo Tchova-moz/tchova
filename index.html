@@ -233,7 +233,31 @@ fare.textContent=
   },()=>{
     tripStatus.textContent='❌ Precisamos da tua localização para calcular a viagem.';
   });
+  }function monitorarStatusViagem(){
+  const pedidoGuardado=localStorage.getItem('tchovaTripRequest');
+
+  if(!pedidoGuardado) return;
+
+  try{
+    const pedido=JSON.parse(pedidoGuardado);
+    const tripStatus=document.getElementById('tripStatus');
+    const fare=document.getElementById('fare');
+
+    if(!tripStatus) return;
+
+    if(pedido.status==='Mototaxista encontrado'){
+      tripStatus.textContent=
+        '🟢 Mototaxista encontrado! A tua viagem foi aceite.';
+
+      fare.textContent=
+        '🛵 O mototaxista aceitou o teu pedido. Prepara-te para a viagem.';
+    }
+  }catch(error){
+    console.log('Erro ao verificar estado da viagem:',error);
   }
+}
+
+setInterval(monitorarStatusViagem,3000);
 renderAuth();
 </script>
 </body>
