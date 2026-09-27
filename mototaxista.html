@@ -93,94 +93,210 @@ button:active{
 </div>
 
 <script>
-
 const pedidoDiv = document.getElementById("pedido");
 
-function carregarPedido(){
+const firebaseBase =
+"https://tchova-62cb7-default-rtdb.europe-west1.firebasedatabase.app/pedidos/";
 
-  const pedidoGuardado =
-    localStorage.getItem("tchovaTripRequest");
+let pedidoRecusadoId = null;
+let viagemAceiteId = null;
 
-  if(!pedidoGuardado){
+async function carregarPedidos(){
 
-    pedidoDiv.innerHTML =
-      '<div class="vazio">Nenhum pedido de viagem disponível.</div>';
+    try{
 
-    return;
-  }
+        const resposta = await fetch(firebaseBase + ".json");
 
-  const pedido = JSON.parse(pedidoGuardado);
+        if(!resposta.ok){
+            throw new Error("Não foi possível consultar os pedidos.");
+        }
 
-  
-if(pedido.status === "Mototaxista encontrado"){
+        const pedidos = await resposta.json();
 
-  pedidoDiv.innerHTML = `
-    <div class="status">
-      🟢 <b>Viagem aceite!</b><br><br>
-      O mototaxista aceitou o pedido do passageiro.
-    </div>
-  `;
+        if(!pedidos){
 
-  return;
+            pedidoDiv.innerHTML =
+            '<div class="vazio">Nenhum pedido de viagem disponível.</div>';
+
+            return;
+        }
+
+        const lista = Object.values(pedidos);
+
+        const pedidoEncontrado = lista.find(pedido =>
+            pedido &&
+            pedido.status === "A procurar mototaxista..." &&
+            pedido.id !== pedidoRecusadoId
+        );
+
+        if(!pedidoEncontrado){
+
+            if(viagemAceiteId){
+                return;
+            }
+
+            pedidoDiv.innerHTML =
+            '<div class="vazio">Nenhum pedido novo disponível.</div>';
+
+            return;
+        }
+
+        mostrarPedido(pedidoEncontrado);
+
+    }catch(error){
+
+        console.error("Erro ao carregar pedidos:", error);
+
+        pedidoDiv.innerHTML =
+        '<div class="vazio">Erro ao procurar pedidos. Tenta novamente.</div>';
+    }
 }
 
-if(pedido.status !== "A procurar mototaxista..."){
 
-  pedidoDiv.innerHTML =
-    '<div class="vazio">Nenhum pedido novo disponível.</div>';
+function mostrarPedido(pedido){
 
-  return;
-}
-  pedidoDiv.innerHTML = `
-    <div class="info">
-      📍 <b>Destino:</b> ${pedido.destinationName}<br>
-      💳 <b>Pagamento:</b> ${pedido.payment}<br>
-      📏 <b>Distância:</b> ${pedido.distanceKm} km<br>
-      💰 <b>Tarifa:</b> ${pedido.estimatedFare} MT
-    </div>
+    pedidoDiv.innerHTML = `
 
-    <div class="status">
-      🟡 Passageiro está à procura de mototaxista.
-    </div>
+        <div class="info">
 
-    <button onclick="aceitarViagem()">
-      🛵 ACEITAR VIAGEM
-    </button>
-  `;
-}
+            📍 <b>Destino:</b>
+            ${pedido.destinationName || "Não informado"}<br>
 
-function aceitarViagem(){
+            💳 <b>Pagamento:</b>
+            ${pedido.payment || "Não informado"}<br>
 
-  const pedidoGuardado =
-    localStorage.getItem("tchovaTripRequest");
+            📏 <b>Distância:</b>
+            ${pedido.distanceKm || "0"} km<br>
 
-  if(!pedidoGuardado){
-    carregarPedido();
-    return;
-  }
+            💰 <b>Tarifa:</b>
+            ${pedido.estimatedFare || "0"} MT
 
-  const pedido = JSON.parse(pedidoGuardado);
+        </div>
 
-  pedido.status = "Mototaxista encontrado";
-  pedido.driverAcceptedAt = new Date().toISOString();
+        <div class="status">
 
-  localStorage.setItem(
-    "tchovaTripRequest",
-    JSON.stringify(pedido)
-  );
+            🟡 Passageiro está à procura de um mototaxista.
 
-  pedidoDiv.innerHTML = `
-    <div class="status">
-      🟢 <b>Viagem aceite!</b><br><br>
-      O mototaxista aceitou o pedido do passageiro.
-    </div>
-  `;
+        </div>
+
+        <button onclick="aceitarViagem('${pedido.id}')">
+
+            🟢 ACEITAR VIAGEM
+
+        </button>
+
+        <button
+            onclick="recusarViagem('${pedido.id}')"
+            style="background:#b00020;">
+
+            🔴 RECUSAR VIAGEM
+
+        </button>
+    `;
 }
 
-carregarPedido();
 
-setInterval(carregarPedido,3000);
+async function aceitarViagem(id){
 
+    try{
+
+        const respostaPedido =
+            await fetch(firebaseBase + encodeURIComponent(id) + ".json");
+
+        if(!respostaPedido.ok){
+            throw new Error("Não foi possível obter o pedido.");
+        }
+
+        const pedido = await respostaPedido.json();
+
+        if(!pedido){
+
+            alert("Este pedido já não está disponível.");
+            carregarPedidos();
+            return;
+        }
+
+        if(pedido.status !== "A procurar mototaxista..."){
+
+            alert("Este pedido já foi aceite por outro mototaxista.");
+
+            carregarPedidos();
+            return;
+        }
+
+        pedido.status = "Mototaxista encontrado";
+
+        pedido.driverAcceptedAt = new Date().toISOString();
+
+        const respostaAtualizacao = await fetch(
+            firebaseBase + encodeURIComponent(id) + ".json",
+            {
+                method: "PUT",
+
+                headers:{
+                    "Content-Type":"application/json"
+                },
+
+                body: JSON.stringify(pedido)
+            }
+        );
+
+        if(!respostaAtualizacao.ok){
+            throw new Error("Não foi possível atualizar o pedido.");
+        }
+
+        localStorage.setItem(
+            "tchovaTripRequest",
+            JSON.stringify(pedido)
+        );
+
+        viagemAceiteId = id;
+
+        pedidoDiv.innerHTML = `
+
+            <div class="status">
+
+                🟢 <b>VIAGEM ACEITE!</b><br><br>
+
+                O mototaxista aceitou o pedido do passageiro.
+
+            </div>
+
+        `;
+
+    }catch(error){
+
+        console.error(error);
+
+        alert(
+            "Não foi possível aceitar a viagem. Tenta novamente."
+        );
+    }
+}
+
+
+function recusarViagem(id){
+
+    pedidoRecusadoId = id;
+
+    pedidoDiv.innerHTML = `
+
+        <div class="status">
+
+            🔴 <b>Pedido recusado.</b><br><br>
+
+            A procurar outros pedidos...
+
+        </div>
+
+    `;
+
+}
+
+
+carregarPedidos();
+
+setInterval(carregarPedidos, 3000);
 </script>
 
 </body>
